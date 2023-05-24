@@ -1,11 +1,17 @@
+using AutoMapper;
+using HotelListing.Configurations;
 using HotelListing.Data;
+using HotelListing.IRepository;
+using HotelListing.Repository;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Newtonsoft.Json;
 using Microsoft.OpenApi.Models;
+using HotelListing.Extensions;
 
 namespace HotelListing
 {
@@ -22,6 +28,13 @@ namespace HotelListing
         public void ConfigureServices(IServiceCollection services)
         {
 
+            //
+            services.AddDbContext<DatabaseContext>(options =>
+                options.UseSqlServer(Configuration.GetConnectionString("SqlConnectString")));
+            //
+            services.AddMemoryCache();
+            services.AddAutoMapper(typeof(MapperInittilizer));
+
             services.AddControllers();
             services.AddCors(option =>
             {
@@ -30,12 +43,23 @@ namespace HotelListing
                 .AllowAnyMethod()
                 .AllowAnyHeader());
             });
-            services.AddDbContext<DatabaseContext>(options => 
-                options.UseSqlServer(Configuration.GetConnectionString("SqlConnectString")));
 
+            //
+            services.AddHttpContextAccessor();
+            services.AddAuthentication();
+            services.ConfigureIdentity();
+
+
+            //
+            services.AddTransient<IUnitOfWork, UnitOfWork>();
+            //
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "HotelListing", Version = "v1" });
+            });
+            services.AddControllers().AddNewtonsoftJson(options =>
+            {
+                options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
             });
         }
 
@@ -59,6 +83,9 @@ namespace HotelListing
 
             app.UseEndpoints(endpoints =>
             {
+                endpoints.MapControllerRoute(
+                    name: "default",
+                    pattern: "{controller=Home}/{action=Index}/{id?}");
                 endpoints.MapControllers();
             });
         }
