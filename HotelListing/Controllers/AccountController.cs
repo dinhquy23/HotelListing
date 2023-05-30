@@ -2,6 +2,7 @@
 using HotelListing.Data;
 using HotelListing.Extensions;
 using HotelListing.Models;
+using HotelListing.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -20,18 +21,20 @@ namespace HotelListing.Controllers
         private readonly SignInManager<ApiUser> _signInManager;
         private readonly ILogger<AccountController> _logger;
         private readonly IMapper _mapper;
+        private readonly IAuthManager _authManager;
 
         public AccountController(
             UserManager<ApiUser> usermanager,
             SignInManager<ApiUser> signInManager,
             ILogger<AccountController> logger,
-            IMapper mapper)
+            IMapper mapper,
+            IAuthManager authManager)
         {
             _userManager = usermanager;
             _signInManager = signInManager;
             _mapper = mapper;
             _logger = logger;
-
+            _authManager = authManager;
         }
 
         /// <summary>
@@ -67,6 +70,7 @@ namespace HotelListing.Controllers
                     {
                         return BadRequest($"{result.Errors.FirstOrDefault().Description}");
                     }
+                    var addRole = await _userManager.AddToRolesAsync(user, userDTO.Roles);
                     return Created(user.Id, user);
                 }
             }
@@ -84,9 +88,6 @@ namespace HotelListing.Controllers
         /// <returns></returns>
         [HttpPost]
         [Route("login")]
-        [ProducesResponseType(StatusCodes.Status202Accepted)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> Login([FromBody] LoginDTO loginDTO)
         {
             _logger.LogInformation($"Login attempt for {loginDTO.Email}");
@@ -96,20 +97,12 @@ namespace HotelListing.Controllers
             }
             try
             {
-                var checkExistUser = await _userManager.FindByEmailAsync(loginDTO.Email);
-                if (checkExistUser != null)
+                if (!await _authManager.ValidateUser(loginDTO))
                 {
-                    var result = await _signInManager.CheckPasswordSignInAsync(checkExistUser, loginDTO.Password, false);
-                    if (result.Succeeded)
-                    {
-                        return StatusCode(StatusCodes.Status200OK, new Responsive("Success", "Login successfully"));
-                    }
-                    return Unauthorized(loginDTO);
+                    return Unauthorized();
                 }
-                else
-                {
-                    return Problem($"User {loginDTO.Email} is not exist");
-                }
+                var token = await _authManager.CreateToken();
+                return Accepted(new TokenRequest { Token = await _authManager.CreateToken()});
             }
             catch (Exception ex)
             {
