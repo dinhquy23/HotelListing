@@ -12,6 +12,9 @@ using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
 using Microsoft.OpenApi.Models;
 using HotelListing.Extensions;
+using HotelListing.Services;
+using System.Collections.Generic;
+using AspNetCoreRateLimit;
 
 namespace HotelListing
 {
@@ -33,9 +36,15 @@ namespace HotelListing
                 options.UseSqlServer(Configuration.GetConnectionString("SqlConnectString")));
             //
             services.AddMemoryCache();
-            services.AddAutoMapper(typeof(MapperInittilizer));
+            services.ConfigureRateLimiting();
+            services.AddHttpContextAccessor();
+            services.ConfigureHttpCacheHeaders();
 
-            services.AddControllers();
+            //
+            services.AddAuthentication();
+            services.ConfigureIdentity();
+            services.ConfigureJWT(Configuration);
+            //
             services.AddCors(option =>
             {
                 option.AddPolicy("AllowAll", builder =>
@@ -44,23 +53,19 @@ namespace HotelListing
                 .AllowAnyHeader());
             });
 
-            //
-            services.AddHttpContextAccessor();
-            services.AddAuthentication();
-            services.ConfigureIdentity();
-
-
+            services.ConfigureAutoMapper();
             //
             services.AddTransient<IUnitOfWork, UnitOfWork>();
+            services.AddScoped<IAuthManager, AuthManager>();
             //
-            services.AddSwaggerGen(c =>
-            {
-                c.SwaggerDoc("v1", new OpenApiInfo { Title = "HotelListing", Version = "v1" });
-            });
+            services.ConfigureSwaggerDoc();
+            //
             services.AddControllers().AddNewtonsoftJson(options =>
             {
-                options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
+                options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore;
             });
+
+            services.ConfigureVersioning();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -69,23 +74,32 @@ namespace HotelListing
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
-                app.UseSwagger();
-                app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "HotelListing v1"));
+               
             }
+            app.UseSwagger();
+            app.UseSwaggerUI(c =>
+            {
+                string swaggerJsonBasePath = string.IsNullOrWhiteSpace(c.RoutePrefix) ? "." : "..";
+                c.SwaggerEndpoint($"{swaggerJsonBasePath}/swagger/v1/swagger.json", "Hotel Listing API");
+            });
 
+            app.ConfigureExceptionHandler();
             app.UseHttpsRedirection();
 
             app.UseCors("AllowAll");
 
+            app.UseResponseCaching();
+            app.UseHttpCacheHeaders();
+            //app.UseIpRateLimiting();
+
             app.UseRouting();
 
+            app.UseAuthentication();
+          
             app.UseAuthorization();
 
             app.UseEndpoints(endpoints =>
             {
-                endpoints.MapControllerRoute(
-                    name: "default",
-                    pattern: "{controller=Home}/{action=Index}/{id?}");
                 endpoints.MapControllers();
             });
         }

@@ -225,6 +225,22 @@ namespace HotelListing.Migrations
                         .HasFilter("[NormalizedName] IS NOT NULL");
 
                     b.ToTable("AspNetRoles");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "9571135c-deca-41a0-88fe-fa313cb1af27",
+                            ConcurrencyStamp = "a7edc8db-3f10-4f27-a74a-64b177c66530",
+                            Name = "Admin",
+                            NormalizedName = "ADMINISTRATOR"
+                        },
+                        new
+                        {
+                            Id = "24e71231-fc80-4a08-82cd-33c26fdc0b3a",
+                            ConcurrencyStamp = "f3aa48da-129e-4064-8472-fa50fbe444f1",
+                            Name = "User",
+                            NormalizedName = "USER"
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
